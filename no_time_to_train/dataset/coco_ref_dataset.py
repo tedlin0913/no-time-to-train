@@ -87,6 +87,7 @@ class COCORefTrainDataset(data.Dataset):
             self.cat_names = self.METAINFO['default_classes']
         else:
             self.cat_names = self.METAINFO[class_split]
+            
         self.cat_ids = self.coco.getCatIds(catNms=self.cat_names)
         self.cat_ids_to_inds, self.cat_inds_to_ids = self._get_cat_inds(self.cat_ids)
 
@@ -182,7 +183,13 @@ class COCORefTrainDataset(data.Dataset):
         return query_points, points_info
 
     def _load_resized_annotation(self, ann, width, height):
-        mask = self.coco.annToMask(ann)
+        try:
+            mask = self.coco.annToMask(ann)
+        except (IndexError, ValueError) as e:
+            print(f"Warning: Skipping annotation with malformed segmentation data: {e}")
+            # Create empty mask as fallback
+            mask = np.zeros((height, width), dtype=np.uint8)
+        
         mask = torch.from_numpy(mask).reshape(1, 1, height, width).to(torch.float)
         mask = F.interpolate(mask, size=(self.image_size, self.image_size), mode="nearest")
         mask = mask.squeeze(dim=0)
@@ -626,16 +633,20 @@ class COCORefTestDataset(COCORefTrainDataset):
 
 
         if self.class_split == "default_classes":
-            from tidecv import TIDE
-            import tidecv.datasets as tide_datasets
+            try:
+                from tidecv import TIDE
+                import tidecv.datasets as tide_datasets
 
-            tide_gt = tide_datasets.COCO(path=self.ann_json_file)
-            tide_res = TideCOCOResult(results)
-            tide = TIDE()
-            tide.evaluate_range(tide_gt, tide_res, mode=TIDE.BOX)
-            tide.summarize()
-            tide.evaluate_range(tide_gt, tide_res, mode=TIDE.MASK)
-            tide.summarize()
+                tide_gt = tide_datasets.COCO(path=self.ann_json_file)
+                tide_res = TideCOCOResult(results)
+                tide = TIDE()
+                tide.evaluate_range(tide_gt, tide_res, mode=TIDE.BOX)
+                tide.summarize()
+                tide.evaluate_range(tide_gt, tide_res, mode=TIDE.MASK)
+                tide.summarize()
+            except (IndexError, ValueError) as e:
+                print(f"Warning: TIDE evaluation failed due to malformed segmentation data: {e}")
+                print("Skipping TIDE evaluation and proceeding with standard COCO evaluation...")
 
 
         
