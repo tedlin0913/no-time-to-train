@@ -92,6 +92,8 @@ def generate_distinct_colors(n_colors, seed=42):
 
 
 def vis_coco(gt_bboxes, gt_labels, gt_masks, scores, labels, bboxes, masks, score_thr, img_path, out_path, show_scores=False, class_names=None, dataset_name='COCO'):
+    print("VIS COCO")
+    
     # Move template_colors inside the function
     if dataset_name.lower() == 'lvis':
         # Generate 1203 colors for LVIS dataset

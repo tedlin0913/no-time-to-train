@@ -114,6 +114,12 @@ class Sam2MatcherLightningModel(LightningModule):
             model_cfg["online_vis"] = model_cfg.pop("test.online_vis")
         if "test.vis_thr" in model_cfg:
             model_cfg["vis_thr"] = float(model_cfg.pop("test.vis_thr"))
+        # Initialize test config if any test parameters exist
+        test_params = ["test.root", "test.json_file", "test.cat_names", "test.class_split"]
+        if any(param in dataset_cfgs for param in test_params):
+            if "test" not in dataset_cfgs:
+                dataset_cfgs["test"] = {}
+                
         if "test.root" in dataset_cfgs:
             dataset_cfgs["test"]["root"] = dataset_cfgs.pop("test.root")
         if "test.json_file" in dataset_cfgs:
@@ -164,6 +170,7 @@ class Sam2MatcherLightningModel(LightningModule):
         return self.seg_model(x, return_iou_grid_scores)
 
     def test_step(self, batch, batch_idx):
+        print(f"========= Test Step ==========")
         assert not self.seg_model.training
         with torch.inference_mode():
             # For clarity, each mode is an independent case although some modes may share similar logistic

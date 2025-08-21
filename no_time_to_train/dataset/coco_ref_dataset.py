@@ -571,6 +571,7 @@ class COCORefTestDataset(COCORefTrainDataset):
         ret["data_mode"] = self.data_mode
         ret["target_img"] = tar_img
         ret["target_img_info"] = OrderedDict()
+        print(f"DEBUG: tar_img_info = {tar_img_info}")
         ret["target_img_info"]["ori_height"] = tar_img_info["height"]
         ret["target_img_info"]["ori_width"] = tar_img_info["width"]
         ret["target_img_info"]["file_name"] = tar_img_info["file_name"]
@@ -692,8 +693,6 @@ class COCORefTestDataset(COCORefTrainDataset):
                 raise RuntimeError("Category %d does not have enough false positives!"%cat_id)
 
 
-
-
         out_pkl_dict = {}
         out_json_dict = {}
         out_json_dict["images"] = []
@@ -735,10 +734,6 @@ class COCORefTestDataset(COCORefTrainDataset):
                 raise RuntimeError("Category %d does not have enough valid false positives!" % cat_id)
 
 
-
-
-
-
         with open(out_pkl, 'wb') as pw:
             pickle.dump(out_pkl_dict, pw)
         print("Sampled negative pickle file is output to: %s" % out_pkl)
@@ -746,13 +741,6 @@ class COCORefTestDataset(COCORefTrainDataset):
         with open(out_json, 'w') as jw:
             json.dump(out_json_dict, jw)
         print("Sampled negative json file is output to: %s" % out_json)
-
-
-
-
-
-
-
 
 
 

@@ -7,6 +7,7 @@ import cv2
 import numpy as np
 from sklearn.decomposition import PCA
 from scipy.optimize import linear_sum_assignment
+from pathlib import Path
 
 import torch
 import torch.nn as nn
@@ -32,6 +33,12 @@ from no_time_to_train.utils import print_dict
 from no_time_to_train.models.matching_baseline_utils import vis_pca, vis_kmeans, fast_l2
 
 import time
+
+
+from pathlib import Path
+import numpy as np, cv2, os, torch
+import torch.nn.functional as F
+
 
 PRINT_TIMING = False
 
@@ -1469,6 +1476,7 @@ class Sam2MatchingBaselineNoAMG(nn.Module):
         masks_feat_size_bool = lr_masks > 0
         masks_feat_size_bool = masks_feat_size_bool.reshape(n_masks, -1)
         tar_feat = tar_feat.reshape(1, self.encoder_h, self.encoder_w, -1).permute(0, 3, 1, 2)
+        
         tar_feat = F.interpolate(
             tar_feat,
             size=tuple(lr_masks.shape[-2:]),
@@ -1644,8 +1652,10 @@ class Sam2MatchingBaselineNoAMG(nn.Module):
         # ----------------------------------------------------------------------------------------
 
         # resizing and converting to output format
+        print(f"DEBUG: target_img_info = {input_dicts[0]['target_img_info']}")
         ori_h = input_dicts[0]["target_img_info"]["ori_height"]
         ori_w = input_dicts[0]["target_img_info"]["ori_width"]
+        print(f"DEBUG: ori_h = {ori_h}, ori_w = {ori_w}")
 
         
         if lr_masks_out.shape[0] == 0:
@@ -2039,6 +2049,8 @@ class Sam2MatchingBaselineNoAMG(nn.Module):
                         self.memory_neg_ready = True
                     else:
                         raise RuntimeError("Negative memory is not ready!")
+                    
+                print(f"=========== forward test ===========")
 
                 return self.forward_test(input_dicts, with_negative=True)
                 # return self.testing_classifier(input_dicts, with_negative=True)
@@ -2050,6 +2062,8 @@ class Sam2MatchingBaselineNoAMG(nn.Module):
                         raise RuntimeError("Memory is not ready!")
                 return self.forward_test(input_dicts, with_negative=False)
                 # return self.testing_classifier(input_dicts, with_negative=False)
+        
+        
         elif data_mode == "test_support":
             assert self.with_negative_refs
             if not self.memory_ready:
@@ -2080,7 +2094,10 @@ class Sam2MatchingBaselineNoAMG(nn.Module):
             img_path = os.path.join(f"./data/coco/allimages", image_info["file_name"])
         else:
             img_path = os.path.join(dataset_imgs_path, image_info["file_name"])
-        out_path = os.path.join(f"./results_analysis/{dataset_name}", image_info["file_name"])
+        
+        rel = Path(image_info["file_name"]).with_suffix(".png")
+        out_path = os.path.join(f"./results_analysis/{dataset_name}", str(rel))
+        # out_path = os.path.join(f"./results_analysis/{dataset_name}", image_info["file_name"])
 
         gt_masks = []
         gt_bboxes = []
@@ -2106,20 +2123,178 @@ class Sam2MatchingBaselineNoAMG(nn.Module):
                 size=(image_info["ori_height"], image_info["ori_width"]),
                 mode="nearest"
             ).squeeze(dim=1).numpy()
-
-        vis_coco(
-            gt_bboxes,
-            gt_labels,
-            gt_masks,
-            scores,
-            labels,
-            bboxes,
-            masks_pred,
-            score_thr=score_thr,
-            img_path=img_path,
-            out_path=out_path,
-            show_scores=show_scores,
-            dataset_name=dataset_name,
-            class_names=class_names
+        
+        self.save_masks_like_gaga(
+            output_dict=output_dict,
+            save_path=out_path
         )
+
+        # vis_coco(
+        #     gt_bboxes,
+        #     gt_labels,
+        #     gt_masks,
+        #     scores,
+        #     labels,
+        #     bboxes,
+        #     masks_pred,
+        #     score_thr=score_thr,
+        #     img_path=img_path,
+        #     out_path=out_path,
+        #     show_scores=show_scores,
+        #     dataset_name=dataset_name,
+        #     class_names=class_names
+        # )
+
+    # def export_masks_for_gaga(
+    #     output_dict,
+    #     gaga_scene_path: str,
+    #     image_path: str,
+    #     confidence_threshold: float = 0.45,
+    #     min_area: int = 64,
+    #     gaga_seg_method: str = "no_time_to_train",
+    #     max_instances: int = 254,
+    # ):
+    #     scores = output_dict.get("scores")
+    #     masks_pred = output_dict.get("binary_masks")
+    #     image_info = output_dict.get("image_info", {})
+
+    #     if scores is None or masks_pred is None:
+    #         return
+
+    #     # to CPU numpy
+    #     scores = scores.detach().cpu().numpy()
+    #     masks_np = masks_pred.detach().cpu().numpy()  # (N,H,W) floats or 0/1
+
+    #     # --- resize to original image size if available ---
+    #     H, W = masks_np.shape[1], masks_np.shape[2]
+    #     ori_h = int(image_info.get("ori_height", H))
+    #     ori_w = int(image_info.get("ori_width",  W))
+    #     if (ori_h, ori_w) != (H, W) and masks_np.shape[0] > 0:
+    #         t = torch.from_numpy(masks_np.astype(np.float32)).unsqueeze(1)  # (N,1,H,W)
+    #         t = F.interpolate(t, size=(ori_h, ori_w), mode="nearest")
+    #         masks_np = t.squeeze(1).numpy()
+    #         H, W = ori_h, ori_w
+
+    #     id_map = np.zeros((H, W), dtype=np.uint8)
+
+    #     # select by conf + area, then sort by score desc, area desc
+    #     candidates = []
+    #     for i, (m, s) in enumerate(zip(masks_np, scores)):
+    #         if s < confidence_threshold:
+    #             continue
+    #         mb = (m > 0.5)
+    #         area = int(mb.sum())
+    #         if area < min_area:
+    #             continue
+    #         candidates.append((i, s, area))
+    #     candidates.sort(key=lambda x: (x[1], x[2]), reverse=True)
+    #     candidates = candidates[:max_instances]
+
+    #     # paint highest-confidence first so overlaps are deterministic
+    #     for new_id, (i, _, __) in enumerate(candidates, start=1):
+    #         id_map[masks_np[i] > 0.5] = new_id
+
+    #     out_dir = os.path.join(gaga_scene_path, f"raw_{gaga_seg_method}_mask")
+    #     os.makedirs(out_dir, exist_ok=True)
+    #     stem = Path(image_path).stem
+    #     cv2.imwrite(os.path.join(out_dir, f"{stem}.png"), id_map)
+    
+    
+    @torch.no_grad()
+    def save_masks_like_gaga(
+        self,
+        output_dict,
+        save_path: str,
+        confidence_threshold: float = 0.45,
+        min_area: int = 0,
+        overlap_ratio_thr: float = 0.1,
+    ):
+        """
+        Convert (binary_masks, scores) in output_dict to a single-channel uint8 id-map
+        (1..K) following the same logic as `get_sam_mask`, then save as PNG.
+
+        Args:
+            output_dict: dict with keys:
+                - "binary_masks": torch.bool tensor (N,H,W) at original image size
+                - "scores":       torch.float tensor (N,)
+            save_path: path to write PNG
+            confidence_threshold: keep masks with score >= this
+            min_area: discard masks with area < min_area (0 means no extra filter)
+            overlap_ratio_thr: compression step keeps regions if
+                            (#pixels painted for idx) / (area of mask idx) >= thr
+        """
+        masks_pred = output_dict.get("binary_masks", None)   # (N,H,W) bool
+        scores     = output_dict.get("scores", None)         # (N,)
+        image_info = output_dict.get("image_info", {})       # optional
+
+        if masks_pred is None or scores is None or masks_pred.numel() == 0:
+            # Nothing to save → write a black PNG with original size if available.
+            H = int(image_info.get("ori_height", 0))
+            W = int(image_info.get("ori_width", 0))
+            if H > 0 and W > 0:
+                cv2.imwrite(save_path, np.zeros((H, W), dtype=np.uint8))
+            return
+
+        # Ensure boolean masks are already at original resolution.
+        # (Your forward_test already upsamples to ori_h/ori_w.)
+        masks = masks_pred  # (N,H,W) bool
+        scores = scores  # (N,)
+
+        # Filter by confidence (and optional area)
+        keep = scores >= confidence_threshold
+        if keep.any():
+            masks = masks[keep]
+            scores = scores[keep]
+        else:
+            H, W = masks.shape[-2:]
+            cv2.imwrite(save_path, np.zeros((H, W), dtype=np.uint8))
+            return
+
+        if min_area > 0:
+            areas = masks.flatten(1).sum(dim=1)  # (N,)
+            keep_area = areas >= min_area
+            if keep_area.any():
+                masks = masks[keep_area]
+                scores = scores[keep_area]
+            else:
+                H, W = masks.shape[-2:]
+                cv2.imwrite(save_path, np.zeros((H, W), dtype=np.uint8))
+                return
+
+        N, H, W = masks.shape
+
+        # Rank-paint in ascending score so higher scores overwrite later
+        # (matches `selected_scores, ranks = torch.sort(selected_scores); ranks += 1; for index in ranks: ...`)
+        _, order = torch.sort(scores, descending=False)  # low → high
+        # temp id map on GPU for speed
+        mask_id = torch.zeros((H, W), dtype=torch.int16, device=masks.device)
+
+        # Write rank ids (1..N but not necessarily contiguous per instance id yet)
+        # Note: +1 so that background=0
+        for rank_pos, idx in enumerate(order, start=1):
+            mask_id[masks[idx]] = rank_pos
+
+        # ---- Compress IDs like the script ----
+        # Keep only regions whose painted area / original mask area >= overlap_ratio_thr
+        # and reindex to 1..K in descending confidence order (so larger id means higher score)
+        id_map = torch.zeros_like(mask_id, dtype=torch.uint8)
+        cur_id = 1
+        # We’ll iterate in *descending* score to assign stable final IDs 1..K by confidence
+        _, desc = torch.sort(scores, descending=True)
+        for pos, sel_idx in enumerate(desc, start=1):
+            # painted region for this sel_idx equals places where mask_id == its rank
+            # its rank is the 1-based position in ascending order:
+            painted_rank = (order == sel_idx).nonzero(as_tuple=True)[0].item() + 1
+            painted = (mask_id == painted_rank)
+            if painted.any():
+                painted_area = painted.sum().item()
+                original_area = masks[sel_idx].sum().item()
+                if original_area > 0 and (painted_area / float(original_area)) >= overlap_ratio_thr:
+                    id_map[painted] = cur_id
+                    cur_id += 1
+
+        # Move to CPU and write PNG
+        id_map_np = id_map.detach().cpu().numpy()
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        cv2.imwrite(save_path, id_map_np)
 

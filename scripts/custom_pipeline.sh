@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # Melon dataset pipeline
-DATASET_NAME=melon
-DATASET_PATH=data/melon
-CAT_NAMES=flower,leaf
-CATEGORY_NUM=2
-SHOT=1
+DATASET_NAME=plant
+DATASET_PATH=../data/nttt/plant2
+CAT_NAMES=leaf
+CATEGORY_NUM=1
+SHOT=5
 YAML_PATH=no_time_to_train/pl_configs/matching_melon_dataset.yaml
-PATH_TO_SAVE_CKPTS=./tmp_ckpts/melon
+PATH_TO_SAVE_CKPTS=./tmp_ckpts/plant
 mkdir -p $PATH_TO_SAVE_CKPTS
 
 echo "Starting melon dataset pipeline..."
@@ -53,10 +53,14 @@ python run_lightening.py test --config $YAML_PATH \
     --model.init_args.model_cfg.memory_bank_cfg.category_num $CATEGORY_NUM \
     --model.init_args.model_cfg.test.imgs_path $DATASET_PATH/images \
     --model.init_args.model_cfg.test.online_vis $ONLINE_VIS \
-    --model.init_args.model_cfg.test.vis_thr $VIS_THR \
+    --model.init_args.model_cfg.test.vis_thr 0.4 \
     --model.init_args.dataset_cfgs.test.root $DATASET_PATH/images \
     --model.init_args.dataset_cfgs.test.json_file $DATASET_PATH/annotations/custom_targets.json \
     --model.init_args.dataset_cfgs.test.cat_names $CAT_NAMES \
+    --export_gaga_masks $DATASET_PATH/raw_mask \
+    --gaga_seg_method no_time_to_train \
+    --gaga_conf_thresh 0.45 \
+    --gaga_min_area 96 \
     --trainer.devices 1
 
 echo "Pipeline completed successfully!"
